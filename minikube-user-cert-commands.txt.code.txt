@@ -1,0 +1,31 @@
+# Create authentication directory
+mkdir -p authentication
+
+# Generate RSA Private Key
+openssl genrsa -out authentication/client.key 2048
+
+# Generate CSR (Certificate Signing Request) for Private Key
+openssl req -new -key authentication/client.key -out authentication/client.csr -subj "/CN=hasan/O=Admin/O=Devops"
+
+# Generate Client Certificate signed by minikube CA
+# Note: Using the correct minikube CA paths
+sudo openssl x509 -req -in authentication/client.csr \
+  -CA /home/hasan123/.minikube/ca.crt \
+  -CAkey /home/hasan123/.minikube/ca.key \
+  -set_serial 101 \
+  -out authentication/client.crt \
+  -days 365
+
+# Update kubeconfig file with User Credentials and Context
+kubectl config set-credentials hasan --client-certificate=authentication/client.crt --client-key=authentication/client.key
+
+kubectl config set-context hasan-context --cluster=minikube --namespace=default --user=hasan
+
+# Switch to the new context (optional)
+# kubectl config use-context hasan-context
+
+# Verify the new context
+kubectl config get-contexts
+
+# Test authentication (this might fail if RBAC is not configured for the user)
+kubectl --context=hasan-context get pods

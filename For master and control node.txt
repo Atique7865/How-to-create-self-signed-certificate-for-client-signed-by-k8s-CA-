@@ -1,0 +1,41 @@
+# Create authentication directory
+mkdir -p authentication
+
+# Generate RSA Private Key
+openssl genrsa -out authentication/client.key 2048
+
+# Generate CSR (Certificate Signing Request) for Private Key
+openssl req -new -key authentication/client.key -out authentication/client.csr -subj "/CN=hasan/O=Admin/O=Devops"
+
+# Generate Client Certificate signed by Kubernetes CA
+# Note: Using the Kubernetes PKI paths
+sudo openssl x509 -req -in authentication/client.csr \
+  -CA /etc/kubernetes/pki/ca.crt \
+  -CAkey /etc/kubernetes/pki/ca.key \
+  -set_serial 101 \
+  -out authentication/client.crt \
+  -days 365
+
+# Copy the generated certificates to your local machine (run this from your local machine)
+# Replace <control-plane-ip> with your master node's IP address
+scp username@<control-plane-ip>:~/authentication/client.* ./authentication/
+
+# On your local machine, update kubeconfig
+kubectl config set-credentials hasan --client-certificate=authentication/client.crt --client-key=authentication/client.key
+
+# Set the cluster details (replace the server address with your API server address)
+kubectl config set-cluster production-cluster \
+  --server=https://<control-plane-ip>:6443 \
+  --certificate-authority=/etc/kubernetes/pki/ca.crt
+
+# Create context
+kubectl config set-context hasan-context \
+  --cluster=production-cluster \
+  --namespace=default \
+  --user=hasan
+
+# Switch to the new context
+kubectl config use-context hasan-context
+
+# Verify the new context
+kubectl config get-contexts
